@@ -1,4 +1,15 @@
-Django == 6.1.2
+# Web framework
+Django==6.1.2
 
-djangorestframework == 3.18.3
-drf-spectacular == 0.30.0
+# REST API
+djangorestframework==3.18.3
+drf-spectacular==0.30.0
+
+# Database
+psycopg[binary]==3.3.6
+
+# Data validation
+phonenumbers==9.0.42
+
+# Environment configuration
+python-dotenv==1.2.4
