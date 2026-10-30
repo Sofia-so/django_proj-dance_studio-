@@ -15,6 +15,7 @@ class User(AbstractUser):
         unique=True,
         validators=[validate_phone]
     )
+    email_verified = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
