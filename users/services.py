@@ -4,8 +4,9 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.conf import settings
 from django.core.mail import send_mail
+from django.utils import timezone
 
-from users.models import User
+from users.models import User, UserSession
 from users.tokens import email_verification_token
 
 
@@ -54,3 +55,14 @@ def register_user(**validated_data):
     send_verification_email(user)
 
     return user
+
+
+@transaction.atomic
+def create_user_session(user: User):
+    now = timezone.now()
+    session = UserSession.objects.create(
+        user=user,
+        expires_at=now + settings.USER_SESSION_ABSOLUTE_LIFETIME,
+        last_activity_at=now,
+    )
+    return session

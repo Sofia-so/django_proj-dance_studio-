@@ -5,7 +5,10 @@ from rest_framework.response import Response
 
 from users.models import User
 from users.tokens import email_verification_token
-from .serializers import RegistrationSerializer
+from .serializers import (
+    RegistrationSerializer,
+    LoginSerializer
+)
 
 
 class RegistrationAPIView(generics.CreateAPIView):
@@ -38,3 +41,13 @@ class VerifyEmailAPIView(generics.GenericAPIView):
             {"detail": "Email successfully verified."},
             status=status.HTTP_200_OK,
         )
+
+
+class LoginAPIView(generics.GenericAPIView):
+    serializer_class = LoginSerializer
+
+    def post(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data["user"]
