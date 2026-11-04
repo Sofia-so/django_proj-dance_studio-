@@ -32,13 +32,12 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 SIMPLE_JWT = {
+    "SIGNING_KEY": os.environ["JWT_SIGNING_KEY"],
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),
-
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
-
-    "UPDATE_LAST_LOGIN": False,
+    "UPDATE_LAST_LOGIN": False
 }
 
 USER_SESSION_ABSOLUTE_LIFETIME = timedelta(days=90)
@@ -61,6 +60,9 @@ INSTALLED_APPS = [
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

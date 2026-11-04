@@ -34,23 +34,22 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
 
 class LoginSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    email = serializers.EmailField(write_only=True)
     password = serializers.CharField(
         write_only=True,
-        trim_whitespace=False,
+        trim_whitespace=False
     )
 
     def validate(self, attrs):
         email = attrs["email"]
         password = attrs["password"]
-
         user = authenticate(
             request=self.context.get("request"),
             email=email,
-            password=password,
+            password=password
         )
 
-        if user is None:
+        if user is None or not user.is_active:
             raise serializers.ValidationError(
                 {"detail": "Invalid email or password."}
             )
@@ -65,3 +64,25 @@ class LoginSerializer(serializers.Serializer):
         attrs["user"] = user
 
         return attrs
+
+
+class LoginResponseSerializer(serializers.Serializer):
+    access = serializers.CharField(
+        help_text="Access JWT. Використовується для авторизації запитів."
+    )
+
+
+class APIErrorSerializer(serializers.Serializer):
+    detail = serializers.CharField(
+        help_text="Опис помилки."
+    )
+
+
+class EmptySerializer(serializers.Serializer):
+    pass
+
+
+class MessageResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+
+
