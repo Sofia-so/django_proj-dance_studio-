@@ -1,7 +1,13 @@
 from django.contrib.auth.models import Group
 from django.db import transaction
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import (
+    force_bytes,
+    force_str
+)
+from django.utils.http import (
+    urlsafe_base64_encode,
+    urlsafe_base64_decode
+)
 from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
@@ -9,11 +15,16 @@ from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.token_blacklist.models import (
+    OutstandingToken,
+    BlacklistedToken
+)
 
 from users.models import User, UserSession
 from users.tokens import (
     email_verification_token,
-    generate_jwt_tokens
+    generate_jwt_tokens,
+    password_reset_token
 )
 
 
@@ -109,3 +120,85 @@ def revoke_user_session(
             pass
 
     return True
+
+
+def generate_password_reset_data(user: User):
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = password_reset_token.make_token(user)
+    return uid, token
+
+
+def send_password_reset_email(user: User):
+    uid, token = generate_password_reset_data(user)
+    reset_url = (
+        f"{settings.PASSWORD_RESET_URL.rstrip('/')}"
+        f"/{uid}/{token}/"
+    )
+    subject = "Password reset"
+    message = (
+        "You requested a password reset.\n\n"
+        f"Follow this link to set a new password:\n{reset_url}\n\n"
+        "If you did not request a password reset, "
+        "you can ignore this email."
+    )
+    send_mail(
+        subject=subject,
+        message=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[user.email],
+        fail_silently=False
+    )
+
+
+def request_password_reset(email: str):
+    user = User.objects.filter(
+        email__iexact=email,
+        is_active=True,
+        email_verified=True
+    ).first()
+
+    if user is None:
+        return
+
+    send_password_reset_email(user)
+
+
+def get_user_from_password_reset_uid(uid: str):
+    try:
+        user_id = force_str(urlsafe_base64_decode(uid))
+        return User.objects.get(pk=user_id)
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+        UnicodeError,
+        User.DoesNotExist
+    ):
+        return None
+
+
+@transaction.atomic
+def set_user_password(
+    user: User,
+    new_password: str
+):
+    now = timezone.now()
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+
+    UserSession.objects.filter(
+        user=user,
+        revoked_at__isnull=True
+    ).update(
+        revoked_at=now
+    )
+
+    outstanding_tokens = OutstandingToken.objects.filter(
+        user=user,
+        expires_at__gt=now
+    )
+
+    for token in outstanding_tokens.iterator():
+        BlacklistedToken.objects.get_or_create(
+            token=token
+        )

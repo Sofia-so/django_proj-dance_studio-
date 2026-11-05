@@ -2,6 +2,8 @@ from typing import cast
 
 from rest_framework import serializers
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 from users.models import User
 from users.services import register_user
@@ -86,3 +88,33 @@ class MessageResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
 
 
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False
+    )
+
+    def validate(self, attrs):
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError({
+                "new_password": "Passwords do not match."
+            })
+        try:
+            validate_password(
+                attrs["new_password"],
+                user=self.context["user"]
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({
+                "new_password": exc.messages
+            })
+
+        return attrs

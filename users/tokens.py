@@ -33,28 +33,31 @@ def generate_jwt_tokens(user: User, session: UserSession):
 
     refresh_lifetime = min(
         api_settings.REFRESH_TOKEN_LIFETIME,
-        remaining_lifetime,
+        remaining_lifetime
     )
     refresh = RefreshToken()
     refresh[api_settings.USER_ID_CLAIM] = str(user.pk)
     refresh["session_id"] = str(session.pk)
     refresh.set_exp(
         from_time=now,
-        lifetime=refresh_lifetime,
+        lifetime=refresh_lifetime
     )
 
     access = refresh.access_token
     access_lifetime = min(
         api_settings.ACCESS_TOKEN_LIFETIME,
-        remaining_lifetime,
+        remaining_lifetime
     )
     access.set_exp(
         from_time=now,
-        lifetime=access_lifetime,
+        lifetime=access_lifetime
     )
     refresh.outstand()
 
     return {
         "refresh": str(refresh),
-        "access": str(access),
+        "access": str(access)
     }
+
+
+password_reset_token = PasswordResetTokenGenerator()
