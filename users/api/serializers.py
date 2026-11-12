@@ -105,12 +105,52 @@ class ResetPasswordSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs["new_password"] != attrs["new_password_confirm"]:
             raise serializers.ValidationError({
-                "new_password": "Passwords do not match."
+                "new_password": "Passwords do not match"
             })
         try:
             validate_password(
                 attrs["new_password"],
                 user=self.context["user"]
+            )
+        except ValidationError as exc:
+            raise serializers.ValidationError({
+                "new_password": exc.messages
+            })
+
+        return attrs
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False
+    )
+
+    def validate(self, attrs):
+        user = self.context["user"]
+
+        if not user.check_password(attrs["old_password"]):
+            raise serializers.ValidationError({
+                "old_password": "Current password is incorrect."
+            })
+
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError({
+                "new_password": "Passwords do not match"
+            })
+
+        try:
+            validate_password(
+                attrs["new_password"],
+                user=user
             )
         except ValidationError as exc:
             raise serializers.ValidationError({

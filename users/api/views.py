@@ -30,14 +30,16 @@ from .serializers import (
     EmptySerializer,
     MessageResponseSerializer,
     ForgotPasswordSerializer,
-    ResetPasswordSerializer
+    ResetPasswordSerializer,
+    ChangePasswordSerializer
 )
 from users.services import (
     create_user_session,
     revoke_user_session,
     request_password_reset,
     set_user_password,
-    get_user_from_password_reset_uid
+    get_user_from_password_reset_uid,
+    change_password
 )
 
 
@@ -114,6 +116,8 @@ class RegistrationAPIView(generics.CreateAPIView):
 
 class VerifyEmailAPIView(generics.GenericAPIView):
     serializer_class = EmptySerializer
+    permission_classes = [AllowAny]
+    authentication_classes = []
 
     @extend_schema(
         summary="Verify email address",
@@ -161,7 +165,12 @@ class VerifyEmailAPIView(generics.GenericAPIView):
         ]
     )
 
-    def get(self, request, uid, token):
+    def get(
+            self,
+            request,
+            uid,
+            token
+    ):
         try:
             user_id = force_str(urlsafe_base64_decode(uid))
             user = User.objects.get(pk=user_id)
@@ -208,7 +217,7 @@ class LoginAPIView(generics.GenericAPIView):
         responses={
             200: LoginResponseSerializer,
             400: APIErrorSerializer,
-            500: APIErrorSerializer,
+            500: APIErrorSerializer
         },
         parameters=[
             OpenApiParameter(
@@ -252,7 +261,12 @@ class LoginAPIView(generics.GenericAPIView):
         ]
     )
 
-    def post(self, request, *args, **kwargs):
+    def post(
+            self,
+            request,
+            *args,
+            **kwargs
+    ):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -413,7 +427,12 @@ class ForgotPasswordAPIView(generics.GenericAPIView):
         ]
     )
 
-    def post(self, request, *args, **kwargs):
+    def post(
+            self,
+            request,
+            *args,
+            **kwargs
+    ):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -482,7 +501,14 @@ class ResetPasswordAPIView(generics.GenericAPIView):
         ]
     )
 
-    def post(self, request, uid, token, *args, **kwargs):
+    def post(
+            self,
+            request,
+            uid,
+            token,
+            *args,
+            **kwargs
+    ):
         user = get_user_from_password_reset_uid(uid)
 
         if (
@@ -492,7 +518,7 @@ class ResetPasswordAPIView(generics.GenericAPIView):
             or not password_reset_token.check_token(user, token)
         ):
             raise ValidationError({
-                "detail": "Invalid or expired password reset link."
+                "detail": "Invalid or expired password reset link"
             })
 
         serializer = self.get_serializer(
@@ -509,6 +535,98 @@ class ResetPasswordAPIView(generics.GenericAPIView):
         )
 
         return Response(
-            {"detail": "Password has been reset successfully."},
+            {"detail": "Password has been reset successfully"},
+            status=status.HTTP_200_OK
+        )
+
+
+class ChangePasswordAPIView(generics.GenericAPIView):
+    serializer_class = ChangePasswordSerializer
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Change password",
+        description="Change password for authenticated users.",
+        request=ChangePasswordSerializer,
+        responses={
+            200: MessageResponseSerializer,
+            400: APIErrorSerializer,
+            401: APIErrorSerializer
+        },
+        examples=[
+            OpenApiExample(
+                name="Change password request",
+                value={
+                    "old_password": "OldSecurePassword123!",
+                    "new_password": "NewSecurePassword123!",
+                    "new_password_confirm": "NewSecurePassword123!"
+                },
+                request_only=True
+            ),
+            OpenApiExample(
+                name="Change password successfully",
+                value={
+                    "detail": "Password has been changed successfully"
+                },
+                response_only=True,
+                status_codes=["200"]
+            ),
+            OpenApiExample(
+                name="Change password validation error",
+                value={
+                    "old_password": ["Current password is incorrect."]
+                },
+                response_only=True,
+                status_codes=["400"]
+            ),
+            OpenApiExample(
+                name="Change password authentication error",
+                value={
+                    "detail": "Authentication credentials were not provided."
+            },
+                response_only=True,
+                status_codes=["401"]
+            )
+        ]
+    )
+
+    def patch(
+            self,
+            request,
+            *args,
+            **kwargs
+    ):
+        serializer = self.get_serializer(
+            data=request.data,
+            context={
+                **self.get_serializer_context(),
+                "user": request.user
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        new_password = serializer.validated_data["new_password"]
+
+        if not user.email_verified:
+            raise ValidationError({
+                "detail": "Email address is not verified."
+            })
+
+        access_token = request.auth
+        try:
+            current_session_id = access_token["session_id"]
+        except (KeyError, TypeError):
+            raise AuthenticationFailed({
+                "detail": "Invalid authentication token"
+            })
+
+        change_password(
+            user=user,
+            new_password=new_password,
+            current_session_id=current_session_id
+        )
+
+        return Response(
+            {"detail": "Password has been changed successfully"},
             status=status.HTTP_200_OK
         )

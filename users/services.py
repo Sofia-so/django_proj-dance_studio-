@@ -19,6 +19,7 @@ from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
     BlacklistedToken
 )
+from uuid import UUID
 
 from users.models import User, UserSession
 from users.tokens import (
@@ -202,3 +203,21 @@ def set_user_password(
         BlacklistedToken.objects.get_or_create(
             token=token
         )
+
+
+@transaction.atomic
+def change_password(
+        user: User,
+        new_password: str,
+        current_session_id: UUID
+):
+    user.set_password(new_password)
+    user.save(update_fields=["password"])
+    UserSession.objects.filter(
+        user=user,
+        revoked_at__isnull=True
+    ).exclude(
+        id=current_session_id
+    ).update(
+        revoked_at=timezone.now()
+    )

@@ -7,7 +7,8 @@ from .views import (
     LoginAPIView,
     LogoutAPIView,
     ResetPasswordAPIView,
-    ForgotPasswordAPIView
+    ForgotPasswordAPIView,
+    ChangePasswordAPIView
 )
 
 app_name = "users"
@@ -47,5 +48,10 @@ urlpatterns = [
         "password/reset/<str:uid>/<str:token>/",
         ResetPasswordAPIView.as_view(),
         name="reset-password"
+    ),
+    path(
+        "password/change/",
+        ChangePasswordAPIView.as_view(),
+        name="password-change"
     ),
 ]
